@@ -1,42 +1,30 @@
 import cv2
 import pytesseract
 import re
-import sqlite3
 from datetime import datetime
 import os
+from supabase import create_client, Client
+
+# --- PEGA TUS LLAVES AQUÍ ADENTRO DE LAS COMILLAS ---
+SUPABASE_URL = "https://sotvsjzujjmwylmnkywv.supabase.co"
+SUPABASE_KEY = "sb_publishable_NKG06zGEOCh4w6YpaCDKYg_lx78L--Z"
+# ----------------------------------------------------
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 LISTAS_RIESGO_ALTO = [
-    "AURA030215HSRGMDA5"  # Tu CURP exacta configurada para detonar Riesgo Alto
+    "AURA030215HSRGMDA5"
 ]
 
-def inicializar_base_de_datos():
-    conexion = sqlite3.connect('expedientes.db')
-    cursor = conexion.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS clientes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            empresa TEXT,
-            fecha TEXT,
-            documento TEXT,
-            curp TEXT,
-            estatus TEXT,
-            nivel_riesgo TEXT
-        )
-    ''')
-    conexion.commit()
-    conexion.close()
-
 def guardar_en_base_de_datos(empresa, documento, curp, estatus, nivel_riesgo):
-    inicializar_base_de_datos()
-    conexion = sqlite3.connect('expedientes.db')
-    cursor = conexion.cursor()
-    fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute('''
-        INSERT INTO clientes (empresa, fecha, documento, curp, estatus, nivel_riesgo)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (empresa, fecha_actual, documento, curp, estatus, nivel_riesgo))
-    conexion.commit()
-    conexion.close()
+    # Guardado directo en la base de datos corporativa en la nube
+    supabase.table('clientes').insert({
+        "empresa": empresa,
+        "documento": documento,
+        "curp": curp,
+        "estatus": estatus,
+        "nivel_riesgo": nivel_riesgo
+    }).execute()
 
 def evaluar_enfoque_basado_en_riesgos(curp):
     if curp in LISTAS_RIESGO_ALTO:
@@ -53,9 +41,6 @@ def evaluar_enfoque_basado_en_riesgos(curp):
         }
 
 def extraer_y_corregir_curp(ruta_imagen, empresa):
-    
-    # Configuración inteligente: Solo forzamos la ruta si estás en tu computadora (Windows).
-    # En la nube (Linux), dejamos que pytesseract lo encuentre automáticamente.
     if os.name == 'nt':
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
