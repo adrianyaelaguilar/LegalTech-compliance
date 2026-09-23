@@ -1,8 +1,7 @@
 import streamlit as st
 import os
-import sqlite3
 import pandas as pd
-from lector import extraer_y_corregir_curp
+from lector import extraer_y_corregir_curp, supabase
 from generador_pdf import crear_acuse_pdf
 from auth import verificar_credenciales
 
@@ -78,42 +77,35 @@ if acceso_concedido:
     # Sección del Historial de Auditoría (Filtrado por Empresa Activa)
     st.subheader(f"📊 Historial de Expedientes y Auditoría — [{empresa_input}]")
     
-    db_path = "expedientes.db"
-    if os.path.exists(db_path):
-        conexion = sqlite3.connect(db_path)
-        try:
-            # Filtramos estrictamente los expedientes que pertenecen a esta empresa
-            df_registros = pd.read_sql_query(
-                "SELECT fecha, documento, curp, estatus, nivel_riesgo FROM clientes WHERE empresa = ? ORDER BY id DESC", 
-                conexion, 
-                params=(empresa_input,)
-            )
-        except Exception:
-            df_registros = pd.DataFrame()
-        conexion.close()
+    try:
+        # Consultamos directamente a la nube de Supabase filtrando por empresa
+        respuesta = supabase.table("clientes").select("fecha, documento, curp, estatus, nivel_riesgo").eq("empresa", empresa_input).order("id", desc=True).execute()
+        df_registros = pd.DataFrame(respuesta.data)
+    except Exception as e:
+        df_registros = pd.DataFrame()
+        st.error(f"Error de conexión con la base de datos: {e}")
         
-        if not df_registros.empty:
-            df_registros['fecha'] = df_registros['fecha'].astype(str).str.slice(0, 10)
-            
-            st.dataframe(df_registros, use_container_width=True, hide_index=True, column_config={
-                "fecha": "Fecha de Registro",
-                "documento": "Documento",
-                "curp": "CURP",
-                "estatus": "Estatus PLD",
-                "nivel_riesgo": "Grado de Riesgo"
-            })
-            
-            csv_data = df_registros.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label=f"📥 Descargar Reporte de Auditoría de {empresa_input} (CSV)",
-                data=csv_data,
-                file_name=f"reporte_auditoria_{empresa_input}.csv",
-                mime="text/csv",
-            )
-        else:
-            st.info("Aún no hay expedientes registrados para esta empresa en el sistema.")
+    if not df_registros.empty:
+        # Formateamos la fecha para que sea legible
+        df_registros['fecha'] = pd.to_datetime(df_registros['fecha']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        st.dataframe(df_registros, use_container_width=True, hide_index=True, column_config={
+            "fecha": "Fecha de Registro",
+            "documento": "Documento",
+            "curp": "CURP",
+            "estatus": "Estatus PLD",
+            "nivel_riesgo": "Grado de Riesgo"
+        })
+        
+        csv_data = df_registros.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"📥 Descargar Reporte de Auditoría de {empresa_input} (CSV)",
+            data=csv_data,
+            file_name=f"reporte_auditoria_{empresa_input}.csv",
+            mime="text/csv",
+        )
     else:
-        st.info("Sube y procesa tu primer documento para inicializar la base de datos.")
+        st.info("Aún no hay expedientes registrados para esta empresa en el sistema.")
 
 else:
     st.info("👈 Ingresa los datos de acceso corporativo en el menú lateral.")
