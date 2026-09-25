@@ -90,7 +90,22 @@ if acceso_concedido:
         
     if not df_registros.empty:
         df_registros['fecha'] = pd.to_datetime(df_registros['fecha']).dt.strftime('%Y-%m-%d %H:%M:%S')
-        st.dataframe(df_registros, use_container_width=True, hide_index=True)
+        
+        st.dataframe(df_registros, use_container_width=True, hide_index=True, column_config={
+            "fecha": "Fecha de Registro",
+            "documento": "Documento",
+            "curp": "CURP",
+            "estatus": "Estatus PLD",
+            "nivel_riesgo": "Grado de Riesgo"
+        })
+        
+        csv_data = df_registros.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"📥 Descargar Reporte de Auditoría de {empresa_input} (CSV)",
+            data=csv_data,
+            file_name=f"reporte_auditoria_{empresa_input}.csv",
+            mime="text/csv",
+        )
     else:
         st.info("Aún no hay expedientes registrados.")
 
