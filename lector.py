@@ -2,6 +2,7 @@ import cv2
 import pytesseract
 import re
 import os
+import fitz  # Librería para procesar PDFs
 from supabase import create_client, Client
 
 # --- TUS LLAVES DE SUPABASE ---
@@ -29,49 +30,59 @@ def evaluar_enfoque_basado_en_riesgos(curp):
         return {
             "estatus": "ALERTA: Coincidencia en Listas de Alto Riesgo",
             "nivel_riesgo": "ALTO",
-            "accion": "Revisión manual obligatoria y debida diligencia reforzada."
+            "accion": "Revision manual obligatoria y debida diligencia reforzada."
         }
     else:
         return {
             "estatus": "APROBADO: Sin Coincidencias de Riesgo",
             "nivel_riesgo": "BAJO",
-            "accion": "Expediente simplificado bajo diligencia estándar."
+            "accion": "Expediente simplificado bajo diligencia estandar."
         }
 
 def comparar_domicilios(texto_ine, texto_comprobante):
-    # Extraemos palabras clave largas (nombres de calles, colonias, municipios)
     palabras_ine = set(re.findall(r'\b[A-Z]{4,}\b', texto_ine.upper()))
     palabras_comp = set(re.findall(r'\b[A-Z]{4,}\b', texto_comprobante.upper()))
     
-    # Filtramos palabras genéricas que no aportan al cruce
     ignoradas = {"CALLE", "COLONIA", "ESTADO", "MEXICO", "NUMERO", "EXTERIOR", "INTERIOR", "FECHA", "NOMBRE", "DOMICILIO", "REPUBLICA", "ELECTORAL", "INSTITUTO", "NACIONAL"}
     palabras_ine = palabras_ine - ignoradas
     palabras_comp = palabras_comp - ignoradas
 
-    # Buscamos coincidencias entre ambos documentos
     coincidencias = palabras_ine.intersection(palabras_comp)
     
-    # Si hay al menos 2 palabras clave idénticas, asumimos que es el mismo domicilio
     if len(coincidencias) >= 2:
         return True, coincidencias
     return False, coincidencias
+
+def extraer_texto(ruta_archivo):
+    """Detecta si es PDF o imagen y extrae el texto automáticamente"""
+    if ruta_archivo.lower().endswith('.pdf'):
+        doc = fitz.open(ruta_archivo)
+        pagina = doc.load_page(0) # Analiza la primera página
+        pix = pagina.get_pixmap(dpi=300) # Alta calidad de lectura
+        ruta_temp = "temp_pdf_render.png"
+        pix.save(ruta_temp)
+        imagen = cv2.imread(ruta_temp)
+    else:
+        imagen = cv2.imread(ruta_archivo)
+        
+    if imagen is None:
+        return ""
+    return pytesseract.image_to_string(imagen)
 
 def procesar_expediente_completo(ruta_ine, ruta_comprobante, empresa):
     if os.name == 'nt':
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-    # 1. Lectura de la INE
-    imagen_ine = cv2.imread(ruta_ine)
-    if imagen_ine is None:
-        return {"error": "No se pudo cargar la imagen de la INE."}
-    
-    texto_ine = pytesseract.image_to_string(imagen_ine)
+    # 1. Lectura de la INE (Soporta PDF e Imagen)
+    texto_ine = extraer_texto(ruta_ine)
+    if not texto_ine:
+        return {"error": "No se pudo leer el documento de la INE."}
 
     patron_etiqueta = r'CURP[\s\S]*?([A-Z0-9]{18})'
     busqueda = re.search(patron_etiqueta, texto_ine)
 
     if not busqueda:
-        return {"error": "No se encontró la CURP en el documento INE."}
+        return {"error": "No se encontro la CURP en el documento INE."}
 
     curp_sucia = busqueda.group(1)
     
@@ -93,11 +104,10 @@ def procesar_expediente_completo(ruta_ine, ruta_comprobante, empresa):
     nivel_riesgo_final = resultado_riesgo["nivel_riesgo"]
     accion_final = resultado_riesgo["accion"]
 
-    # 2. Lectura del Comprobante (si se proporcionó uno)
+    # 2. Lectura del Comprobante (Soporta PDF e Imagen)
     if ruta_comprobante:
-        imagen_comp = cv2.imread(ruta_comprobante)
-        if imagen_comp is not None:
-            texto_comp = pytesseract.image_to_string(imagen_comp)
+        texto_comp = extraer_texto(ruta_comprobante)
+        if texto_comp:
             coincide, coincidencias = comparar_domicilios(texto_ine, texto_comp)
             
             if coincide:
