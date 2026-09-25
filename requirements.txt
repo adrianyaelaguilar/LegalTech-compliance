@@ -4,3 +4,4 @@ pytesseract
 pandas
 fpdf
 supabase
+PyMuPDF
