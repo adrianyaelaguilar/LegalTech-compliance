@@ -96,3 +96,8 @@ if acceso_concedido:
 
 else:
     st.info("👈 Ingresa los datos de acceso corporativo en el menú lateral.")
+    st.markdown("""
+    ### 🔑 Cuentas de prueba disponibles para demostración:
+    * **Empresa 1:** `Despacho Juridico Garcia` | **Contraseña:** `garcia2026`
+    * **Empresa 2:** `Financiera del Norte` | **Contraseña:** `norte2026`
+    """)
