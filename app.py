@@ -29,18 +29,20 @@ if acceso_concedido:
     col1, col2 = st.columns(2)
     
     with col1:
-        archivo_ine = st.file_uploader("1. Sube la imagen de la INE", type=["png", "jpg", "jpeg"])
+        archivo_ine = st.file_uploader("1. Sube la INE (Imagen o PDF)", type=["png", "jpg", "jpeg", "pdf"])
     with col2:
-        archivo_comp = st.file_uploader("2. Sube el Comprobante de Domicilio (Opcional)", type=["png", "jpg", "jpeg"])
+        archivo_comp = st.file_uploader("2. Sube el Comprobante (Opcional - Imagen o PDF)", type=["png", "jpg", "jpeg", "pdf"])
     
     if archivo_ine is not None:
-        ruta_ine = "temp_ine.png"
+        ext_ine = archivo_ine.name.split('.')[-1].lower()
+        ruta_ine = f"temp_ine.{ext_ine}"
         with open(ruta_ine, "wb") as f:
             f.write(archivo_ine.getbuffer())
             
         ruta_comp = None
         if archivo_comp is not None:
-            ruta_comp = "temp_comp.png"
+            ext_comp = archivo_comp.name.split('.')[-1].lower()
+            ruta_comp = f"temp_comp.{ext_comp}"
             with open(ruta_comp, "wb") as f:
                 f.write(archivo_comp.getbuffer())
         
